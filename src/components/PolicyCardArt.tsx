@@ -1,16 +1,6 @@
 import { Feather, Skull } from "lucide-react";
 import type { Policy } from "../types/game";
-
-/**
- * Shared policy card artwork used in both the game boards (mini)
- * and the legislative phase (full interactive card).
- */
-
-// ── Shared colours ────────────────────────────────────────────────────────────
-export const POLICY_ACCENT: Record<Policy, string> = {
-  L: "#2e7da3",
-  F: "#c94228",
-};
+import { POLICY_ACCENT } from "../lib/policyColors";
 
 // ── Full interactive card (Legislative phase) ─────────────────────────────────
 

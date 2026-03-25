@@ -5,6 +5,7 @@ import {
   updateDoc,
   collection,
   increment,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import type { Game, Player, Policy, PrivateRole } from "../types/game";
@@ -53,8 +54,9 @@ export async function joinGame(gameId: string, player: Player): Promise<void> {
   if (game.players.length >= 10) throw new Error("Game is full (max 10 players).");
   if (game.players.includes(player.uid)) return; // already in
 
+  // arrayUnion is atomic — prevents race condition when two players join simultaneously
   await updateDoc(ref, {
-    players: [...game.players, player.uid],
+    players: arrayUnion(player.uid),
     [`playerMap.${player.uid}`]: player,
   });
 }
@@ -79,16 +81,14 @@ export async function startGame(gameId: string): Promise<void> {
   for (let i = 0; i < game.players.length; i++) {
     const uid = game.players[i];
     const role = roles[i];
-    let knownFascists: string[] = [];
-
-    if (role === "fascist") {
-      // Fascists know each other and who Hitler is — Hitler knows nobody
-      knownFascists = [...fascistUids, hitlerUid].filter((id) => id !== uid);
-    }
+    // Fascists know all other fascists + Hitler; Hitler knows nobody
+    const knownFascists = role === "fascist" ? fascistUids.filter((id) => id !== uid) : [];
+    const knownHitler = role === "fascist" ? hitlerUid : null;
 
     await setDoc(doc(db, "games", gameId, "roles", uid), {
       role,
       knownFascists,
+      hitlerUid: knownHitler,
     } as PrivateRole);
   }
 
@@ -123,36 +123,39 @@ export async function castVote(
   vote: boolean
 ): Promise<void> {
   const ref = doc(db, "games", gameId);
+
+  // Step 1: Guard check — bail early if voting is no longer open
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
   const game = snap.data() as Game;
-
-  // Guard: only process votes while voting is actually open (prevents double-tally race condition)
   if (!game.votingOpen || game.phase !== "election") return;
 
-  const newVotes = { ...game.votes, [uid]: vote };
-  const alivePlayers = game.players.filter((id) => game.playerMap[id]?.isAlive);
+  // Step 2: Write just this player's vote atomically
+  await updateDoc(ref, { [`votes.${uid}`]: vote });
 
-  // Check if all alive players have voted
-  const allVoted = alivePlayers.every((id) => id in newVotes);
+  // Step 3: Re-read fresh state to see all concurrent votes
+  const freshSnap = await getDoc(ref);
+  if (!freshSnap.exists()) return;
+  const fresh = freshSnap.data() as Game;
 
-  if (!allVoted) {
-    await updateDoc(ref, { [`votes.${uid}`]: vote });
-    return;
-  }
+  // If another caller already tallied, bail
+  if (!fresh.votingOpen || fresh.phase !== "election") return;
 
-  // Tally
-  const jaCount = Object.values(newVotes).filter(Boolean).length;
+  const alivePlayers = fresh.players.filter((id) => fresh.playerMap[id]?.isAlive);
+  const allVoted = alivePlayers.every((id) => id in fresh.votes);
+  if (!allVoted) return;
+
+  // Step 4: Tally using fresh state
+  const jaCount = Object.values(fresh.votes).filter(Boolean).length;
   const majority = jaCount > alivePlayers.length / 2;
 
   if (majority) {
     // Government formed — check if Hitler is elected as Chancellor with 3+ fascist policies
-    const roleSnap = await getDoc(doc(db, "games", gameId, "roles", game.nominatedChancellor!));
+    const roleSnap = await getDoc(doc(db, "games", gameId, "roles", fresh.nominatedChancellor!));
     const role = roleSnap.exists() ? (roleSnap.data() as PrivateRole).role : null;
 
-    if (role === "hitler" && game.fascistPolicies >= 3) {
+    if (role === "hitler" && fresh.fascistPolicies >= 3) {
       await updateDoc(ref, {
-        [`votes.${uid}`]: vote,
         votingOpen: false,
         winner: "fascist",
         winReason: "Hitler was elected Chancellor",
@@ -163,17 +166,15 @@ export async function castVote(
     }
 
     // Draw 3 policies
-    const { draw, discard } = ensureDeck(game.drawPile, game.discardPile);
+    const { draw, discard } = ensureDeck(fresh.drawPile, fresh.discardPile);
     const drawnPolicies = draw.slice(0, 3);
     const remaining = draw.slice(3);
 
     await updateDoc(ref, {
-      [`votes.${uid}`]: vote,
       votingOpen: false,
-      votes: newVotes,
       electionTracker: 0,
-      lastPresidentUid: game.players[game.presidentIndex],
-      lastChancellorUid: game.nominatedChancellor,
+      lastPresidentUid: fresh.players[fresh.presidentIndex],
+      lastChancellorUid: fresh.nominatedChancellor,
       drawnPolicies,
       drawPile: remaining,
       discardPile: discard,
@@ -181,22 +182,20 @@ export async function castVote(
     });
   } else {
     // Failed election — advance tracker
-    const newTracker = game.electionTracker + 1;
+    const newTracker = fresh.electionTracker + 1;
 
     if (newTracker >= 3) {
       // Chaos: enact top policy automatically
-      const { draw, discard } = ensureDeck(game.drawPile, game.discardPile);
+      const { draw, discard } = ensureDeck(fresh.drawPile, fresh.discardPile);
       const enacted = draw[0] as Policy;
       const isLib = enacted === "L";
-      const newLib = game.liberalPolicies + (isLib ? 1 : 0);
-      const newFas = game.fascistPolicies + (isLib ? 0 : 1);
+      const newLib = fresh.liberalPolicies + (isLib ? 1 : 0);
+      const newFas = fresh.fascistPolicies + (isLib ? 0 : 1);
       const { winner, reason } = checkWin({ liberalPolicies: newLib, fascistPolicies: newFas });
 
-      const nextPresidentIndex = nextAlivePresidentIndex(game.presidentIndex, game.players, game.playerMap);
+      const nextPresidentIndex = nextAlivePresidentIndex(fresh.presidentIndex, fresh.players, fresh.playerMap);
 
       await updateDoc(ref, {
-        [`votes.${uid}`]: vote,
-        votes: newVotes,
         votingOpen: false,
         electionTracker: 0,
         liberalPolicies: newLib,
@@ -207,7 +206,7 @@ export async function castVote(
         lastPresidentUid: null,
         lastChancellorUid: null,
         presidentIndex: nextPresidentIndex,
-        round: game.round + 1,
+        round: fresh.round + 1,
         phase: winner ? "finished" : "election",
         status: winner ? "finished" : "in_progress",
         winner: winner ?? null,
@@ -216,16 +215,14 @@ export async function castVote(
       return;
     }
 
-    const nextPresidentIndex = nextAlivePresidentIndex(game.presidentIndex, game.players, game.playerMap);
+    const nextPresidentIndex = nextAlivePresidentIndex(fresh.presidentIndex, fresh.players, fresh.playerMap);
 
     await updateDoc(ref, {
-      [`votes.${uid}`]: vote,
-      votes: newVotes,
       votingOpen: false,
       electionTracker: newTracker,
       nominatedChancellor: null,
       presidentIndex: nextPresidentIndex,
-      round: game.round + 1,
+      round: fresh.round + 1,
       phase: "election",
     });
   }
@@ -471,14 +468,14 @@ export async function createSoloGame(
   for (let i = 0; i < playerUids.length; i++) {
     const uid = playerUids[i];
     const role = roles[i];
-    let knownFascists: string[] = [];
+    const knownFascists = role === "fascist" ? fascistUids.filter((id) => id !== uid) : [];
+    const knownHitler = role === "fascist" ? hitlerUid : null;
 
-    if (role === "fascist") {
-      // Fascists know each other and who Hitler is — Hitler knows nobody
-      knownFascists = [...fascistUids, hitlerUid].filter((id) => id !== uid);
-    }
-
-    await setDoc(doc(db, "games", ref.id, "roles", uid), { role, knownFascists });
+    await setDoc(doc(db, "games", ref.id, "roles", uid), {
+      role,
+      knownFascists,
+      hitlerUid: knownHitler,
+    } as PrivateRole);
   }
 
   return ref.id;

@@ -45,9 +45,17 @@ const CONFIG = {
 
 export default function RoleCard({ roleData, players, onClose }: RoleCardProps) {
   const cfg = CONFIG[roleData.role];
-  const knownNames = roleData.knownFascists
+
+  // Fellow fascists (not Hitler)
+  const fascistNames = roleData.knownFascists
     .map((uid) => players.find((p) => p.uid === uid)?.displayName ?? uid)
     .filter(Boolean);
+
+  // Hitler's name (only visible to fascists, never to Hitler himself)
+  const hitlerName = roleData.hitlerUid
+    ? (players.find((p) => p.uid === roleData.hitlerUid)?.displayName ?? roleData.hitlerUid)
+    : null;
+
 
   const IconComp =
     roleData.role === "liberal" ? Shield : roleData.role === "fascist" ? Skull : Eye;
@@ -155,9 +163,9 @@ export default function RoleCard({ roleData, players, onClose }: RoleCardProps) 
         </p>
 
         {/* ── Known teammates ─────────────────────────────────── */}
-        {knownNames.length > 0 && (
+        {(fascistNames.length > 0 || hitlerName !== null) && (
           <div
-            className="mx-5 mb-3 rounded-xl p-3 space-y-1 border"
+            className="mx-5 mb-3 rounded-xl p-3 space-y-1.5 border"
             style={{ background: "rgba(0,0,0,0.06)", borderColor: cfg.borderColor }}
           >
             <p
@@ -166,14 +174,19 @@ export default function RoleCard({ roleData, players, onClose }: RoleCardProps) 
             >
               Your Team
             </p>
-            {knownNames.map((name) => (
-              <p
-                key={name}
-                className="font-bold text-sm text-center"
-                style={{ color: "#2a2a2a" }}
-              >
-                {name}
-              </p>
+            {/* Hitler — shown with red label so fascists know who to protect */}
+            {hitlerName !== null && (
+              <div className="flex items-center justify-between bg-red-900/20 rounded-lg px-2 py-1">
+                <span className="text-[10px] font-black tracking-widest text-red-600">HITLER</span>
+                <span className="font-bold text-sm" style={{ color: "#2a2a2a" }}>{hitlerName}</span>
+              </div>
+            )}
+            {/* Fellow fascists */}
+            {fascistNames.map((name) => (
+              <div key={name} className="flex items-center justify-between bg-orange-900/20 rounded-lg px-2 py-1">
+                <span className="text-[10px] font-black tracking-widest text-orange-700">FASCIST</span>
+                <span className="font-bold text-sm" style={{ color: "#2a2a2a" }}>{name}</span>
+              </div>
             ))}
           </div>
         )}

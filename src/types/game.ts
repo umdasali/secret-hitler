@@ -24,7 +24,8 @@ export interface Player {
 
 export interface PrivateRole {
   role: Role;
-  knownFascists: string[]; // uids
+  knownFascists: string[]; // uids of fellow fascists (NOT including Hitler)
+  hitlerUid: string | null; // set only for fascists; null for liberal/hitler
 }
 
 export interface Vote {

@@ -152,7 +152,7 @@ export default function ElectionPhase({ game, myUid, gameId }: ElectionPhaseProp
       {isPresident ? (
         <div className="space-y-3">
           <p className="text-center text-gray-300 text-sm font-semibold">
-            Choose your Chancellor:
+            You are President — choose your Chancellor:
           </p>
           {finalEligible.map((uid) => (
               <button
