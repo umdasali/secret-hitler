@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isGamePlayer(gameId) {
+      return isSignedIn() &&
+        request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.players;
+    }
+
+    function isGameHost(gameId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/games/$(gameId)).data.hostUid == request.auth.uid;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
+    // Anyone signed in can read (needed for leaderboard).
+    // Only the owner can create/update their own document.
+    match /users/{uid} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── Games ──────────────────────────────────────────────────────────────
+    match /games/{gameId} {
+      // Any signed-in user may read a game (needed for join by code).
+      allow read: if isSignedIn();
+
+      // Only the host field owner may create.
+      allow create: if isSignedIn() &&
+                       request.resource.data.hostUid == request.auth.uid;
+
+      // Any current player (or host) may update game state.
+      allow update: if isSignedIn() && (
+                       request.auth.uid in resource.data.players ||
+                       request.auth.uid == resource.data.hostUid
+                    );
+
+      // ── Roles subcollection ────────────────────────────────────────────
+      // Write: only the host can assign roles (during startGame).
+      // Read:  any player in the game can read any role document.
+      //        This is intentional for client-side power resolution
+      //        (investigate, execution). In production use Cloud Functions.
+      match /roles/{roleUid} {
+        allow read:  if isGamePlayer(gameId);
+        allow write: if isGameHost(gameId);
+      }
+    }
+  }
+}
