@@ -104,12 +104,12 @@ function DossierCard({
             <div style={{ color: accent }}>{icon}</div>
           </div>
           <div>
-            <p className="font-bold tracking-[0.3em] leading-none" style={{ fontSize: 8, color: accentDim }}>
+            <p className="font-bold tracking-[0.3em] leading-none" style={{ fontSize: 8, color: accent }}>
               {operation}
             </p>
             <p
               className="font-black tracking-[0.12em] mt-0.5"
-              style={{ color: "#ddd5c8", fontFamily: "Georgia, serif", fontSize: 14 }}
+              style={{ color: "#e8ddd0", fontFamily: "Georgia, serif", fontSize: 15 }}
             >
               {title}
             </p>
@@ -120,7 +120,7 @@ function DossierCard({
         <div className="h-px" style={{ background: `${accent}25` }} />
 
         {/* Description */}
-        <p className="text-xs leading-relaxed flex-1" style={{ color: "#5a3535" }}>
+        <p className="text-xs leading-relaxed flex-1" style={{ color: "#907878" }}>
           {description}
         </p>
 
@@ -191,49 +191,49 @@ export default function HomePage() {
     >
       {/* ── Nav ── */}
       <nav
-        className="flex items-center justify-between px-6 py-3"
+        className="flex items-center justify-between px-4 sm:px-6 py-3"
         style={{ borderBottom: "1px solid #1e0505" }}
       >
         {/* Wordmark */}
         <div className="flex items-center gap-1.5">
           <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#1a0202", border: "1px solid #4a0808" }}>
-            <Shield size={11} style={{ color: "#7a0a0a" }} strokeWidth={1.5} />
+            <Shield size={11} style={{ color: "#9a1a1a" }} strokeWidth={1.5} />
           </div>
-          <span className="font-black tracking-[0.25em] text-xs" style={{ color: "#4a0808" }}>
+          <span className="font-black tracking-[0.2em] text-xs" style={{ color: "#8a2020" }}>
             SECRET HITLER
           </span>
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-5">
-          <span className="text-xs" style={{ color: "#3a1515" }}>{user?.displayName}</span>
+        <div className="flex items-center gap-3 sm:gap-5">
+          <span className="hidden sm:block text-xs" style={{ color: "#7a5050" }}>{user?.displayName}</span>
           <button
             onClick={() => navigate("/leaderboard")}
             className="text-xs flex items-center gap-1 transition hover:opacity-80"
-            style={{ color: "#5a3535" }}
+            style={{ color: "#9a7070" }}
           >
-            <Trophy size={11} /> Leaderboard
+            <Trophy size={11} /> <span className="hidden sm:inline">Leaderboard</span>
           </button>
           <button
             onClick={logout}
             className="text-xs flex items-center gap-1 transition hover:opacity-80"
-            style={{ color: "#5a2a2a" }}
+            style={{ color: "#9a6060" }}
           >
-            <LogOut size={11} /> Sign Out
+            <LogOut size={11} /> <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 gap-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12 gap-8 sm:gap-12">
 
         {/* Emblem + title block */}
         <div className="text-center space-y-5 select-none">
 
           {/* Geheimakte label */}
           <p
-            className="tracking-[0.55em] font-black text-center"
-            style={{ fontSize: 9, color: "#400808" }}
+            className="tracking-[0.4em] font-black text-center"
+            style={{ fontSize: 9, color: "#6a2020" }}
           >
             ✦ &nbsp;GEHEIMAKTE&nbsp; ✦ &nbsp;CLASSIFIED&nbsp; ✦ &nbsp;GEHEIMAKTE&nbsp; ✦
           </p>
@@ -280,13 +280,13 @@ export default function HomePage() {
           {/* Tagline */}
           <div className="space-y-1 pt-1">
             <div className="flex items-center gap-3 justify-center">
-              <div className="w-8 h-px" style={{ background: "#2a0808" }} />
-              <p className="tracking-[0.25em] text-xs font-semibold" style={{ color: "#3a1515" }}>
+              <div className="w-8 h-px" style={{ background: "#3a0a0a" }} />
+              <p className="tracking-[0.25em] text-xs font-semibold" style={{ color: "#8a4444" }}>
                 SOCIAL DEDUCTION
               </p>
-              <div className="w-8 h-px" style={{ background: "#2a0808" }} />
+              <div className="w-8 h-px" style={{ background: "#3a0a0a" }} />
             </div>
-            <p className="tracking-[0.18em] font-semibold" style={{ fontSize: 10, color: "#2a1010" }}>
+            <p className="tracking-[0.18em] font-semibold" style={{ fontSize: 10, color: "#6a3535" }}>
               FOR 5 TO 10 PLAYERS
             </p>
           </div>
@@ -302,8 +302,8 @@ export default function HomePage() {
             operation="ESTABLISH OPERATION"
             title="Create Room"
             description="Open a new lobby. Share the access code with your operatives and start when ready."
-            accent="#9b2020"
-            accentDim="#4a1515"
+            accent="#e03030"
+            accentDim="#6a2020"
             btnLabel={loading ? "Creating…" : "Create Room"}
             onClick={handleCreate}
             disabled={loading}
@@ -316,8 +316,8 @@ export default function HomePage() {
             operation="REQUEST ACCESS"
             title="Join Room"
             description="Enter the room code provided by your operative to infiltrate an existing operation."
-            accent="#1a5a8a"
-            accentDim="#1a3a5a"
+            accent="#3a90cc"
+            accentDim="#2a5a8a"
             btnLabel={loading ? "Joining…" : "Enter Room"}
             onClick={handleJoin}
             disabled={loading}
@@ -327,12 +327,12 @@ export default function HomePage() {
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-              placeholder="Room code"
-              className="w-full rounded px-3 py-2.5 text-sm placeholder-[#2a1a1a] focus:outline-none"
+              placeholder="Enter room code…"
+              className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
               style={{
-                background: "#080202",
-                border: "1px solid #1a3a5a",
-                color: "#9ab8d0",
+                background: "#080608",
+                border: "1px solid #2a5a8a",
+                color: "#a0c8e8",
               }}
             />
           </DossierCard>
@@ -344,8 +344,8 @@ export default function HomePage() {
             operation="INTELLIGENCE SIM"
             title="Solo vs Bots"
             description="Run a classified simulation. Practice your deception and deduction against AI operatives."
-            accent="#6a2a8a"
-            accentDim="#3a1a5a"
+            accent="#b060e0"
+            accentDim="#6a308a"
             btnLabel="Play Solo"
             onClick={() => navigate("/solo")}
           />
@@ -361,8 +361,8 @@ export default function HomePage() {
 
         {/* Bottom classified stamp */}
         <p
-          className="tracking-[0.5em] font-black"
-          style={{ fontSize: 8, color: "#1a0505" }}
+          className="tracking-[0.4em] font-black"
+          style={{ fontSize: 8, color: "#4a1a1a" }}
         >
           ✦ &nbsp;TOP SECRET&nbsp; ✦ &nbsp;EYES ONLY&nbsp; ✦ &nbsp;TOP SECRET&nbsp; ✦
         </p>

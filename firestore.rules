@@ -35,8 +35,10 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
                        request.resource.data.hostUid == request.auth.uid;
 
-      // Any current player (or host) may update game state.
+      // Any current player or host may update game state.
+      // Also allow any signed-in user to update a lobby game (needed for join).
       allow update: if isSignedIn() && (
+                       resource.data.status == "lobby" ||
                        request.auth.uid in resource.data.players ||
                        request.auth.uid == resource.data.hostUid
                     );
