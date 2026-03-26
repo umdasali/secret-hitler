@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
-import { startGame } from "../lib/gameActions";
+import { startGame, leaveLobby } from "../lib/gameActions";
 import type { Game } from "../types/game";
 
 export default function LobbyPage() {
@@ -13,6 +13,7 @@ export default function LobbyPage() {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   useEffect(() => {
     if (!gameId) return;
@@ -26,6 +27,12 @@ export default function LobbyPage() {
     });
     return unsub;
   }, [gameId, navigate]);
+
+  async function handleExit() {
+    if (!gameId || !user) return;
+    await leaveLobby(gameId, user.uid);
+    navigate("/");
+  }
 
   async function handleStart() {
     if (!gameId) return;
@@ -53,6 +60,35 @@ export default function LobbyPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4 py-10 space-y-8">
+
+      {/* Exit confirmation modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <h2 className="text-lg font-bold text-white">Exit Lobby?</h2>
+            <p className="text-gray-400 text-sm">
+              {game?.hostUid === user?.uid
+                ? "You are the host. Leaving will transfer host to the next player."
+                : "You will be removed from this lobby."}
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl py-2.5 text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExit}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl py-2.5 text-sm transition"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-center space-y-1">
         <h1 className="text-4xl font-bold text-red-500">Game Lobby</h1>
         <p className="text-gray-400 text-sm">Share this code with your friends</p>
@@ -109,17 +145,25 @@ export default function LobbyPage() {
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
-      {isHost ? (
+      <div className="flex flex-col items-center gap-3 w-full max-w-md">
+        {isHost ? (
+          <button
+            onClick={handleStart}
+            disabled={!canStart || starting}
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold rounded-xl px-10 py-4 text-lg transition"
+          >
+            {starting ? "Starting…" : "Start Game"}
+          </button>
+        ) : (
+          <p className="text-gray-500 text-sm">Waiting for the host to start…</p>
+        )}
         <button
-          onClick={handleStart}
-          disabled={!canStart || starting}
-          className="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold rounded-xl px-10 py-4 text-lg transition"
+          onClick={() => setShowExitConfirm(true)}
+          className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 font-semibold rounded-xl px-10 py-3 text-sm transition border border-gray-700"
         >
-          {starting ? "Starting…" : "Start Game"}
+          Exit Lobby
         </button>
-      ) : (
-        <p className="text-gray-500 text-sm">Waiting for the host to start…</p>
-      )}
+      </div>
     </div>
   );
 }

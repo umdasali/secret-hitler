@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   increment,
   arrayUnion,
@@ -373,6 +374,87 @@ export async function executePower(
       phase: "election",
     });
   }
+}
+
+// ─── Leave Lobby ─────────────────────────────────────────────────────────────
+
+export async function leaveLobby(gameId: string, uid: string): Promise<void> {
+  const ref = doc(db, "games", gameId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const game = snap.data() as Game;
+
+  const newPlayers = game.players.filter((id) => id !== uid);
+
+  if (newPlayers.length === 0) {
+    await deleteDoc(ref);
+    return;
+  }
+
+  const newPlayerMap = { ...game.playerMap };
+  delete newPlayerMap[uid];
+
+  const newHostUid = uid === game.hostUid ? newPlayers[0] : game.hostUid;
+
+  await updateDoc(ref, {
+    players: newPlayers,
+    playerMap: newPlayerMap,
+    hostUid: newHostUid,
+  });
+}
+
+// ─── Leave Game (in-progress) ─────────────────────────────────────────────────
+
+export async function leaveGame(gameId: string, uid: string): Promise<void> {
+  const ref = doc(db, "games", gameId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const game = snap.data() as Game;
+
+  const newPlayers = game.players.filter((id) => id !== uid);
+  // Count alive players that remain (excluding bots so the threshold is real humans)
+  const remainingAlive = newPlayers.filter((id) => game.playerMap[id]?.isAlive);
+
+  if (remainingAlive.length < 5) {
+    // Too few players to continue — delete the game entirely
+    await deleteDoc(ref);
+    return;
+  }
+
+  // Enough players remain — reset to lobby so they can start fresh
+  const newPlayerMap: Game["playerMap"] = {};
+  for (const id of newPlayers) {
+    newPlayerMap[id] = { ...game.playerMap[id], isAlive: true };
+  }
+
+  const newHostUid = uid === game.hostUid ? newPlayers[0] : game.hostUid;
+
+  await updateDoc(ref, {
+    players: newPlayers,
+    playerMap: newPlayerMap,
+    hostUid: newHostUid,
+    status: "lobby",
+    phase: "lobby",
+    round: 0,
+    presidentIndex: 0,
+    electionTracker: 0,
+    liberalPolicies: 0,
+    fascistPolicies: 0,
+    drawPile: [],
+    discardPile: [],
+    votes: {},
+    votingOpen: false,
+    nominatedChancellor: null,
+    lastPresidentUid: null,
+    lastChancellorUid: null,
+    drawnPolicies: null,
+    chancellorHand: null,
+    pendingPower: null,
+    winner: null,
+    winReason: null,
+    isSoloMode: false,
+    botUids: [],
+  });
 }
 
 // ─── Leaderboard (self-update only) ──────────────────────────────────────────

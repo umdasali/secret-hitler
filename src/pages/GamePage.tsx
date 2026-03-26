@@ -12,6 +12,7 @@ import {
   presidentDiscard,
   chancellorEnact,
   executePower,
+  leaveGame,
 } from "../lib/gameActions";
 import type { Game, PrivateRole, Role } from "../types/game";
 import {
@@ -38,6 +39,7 @@ export default function GamePage() {
   const [myRole, setMyRole] = useState<PrivateRole | null>(null);
   const [showRole, setShowRole] = useState(true);
   const [resultRecorded, setResultRecorded] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Vote result overlay — captured when voting closes so it stays visible 3s
   const [voteSnapshot, setVoteSnapshot] = useState<{
@@ -82,6 +84,19 @@ export default function GamePage() {
     setResultRecorded(true);
     recordMyResult(gameId, user.uid, game.winner);
   }, [game?.status, game?.winner, gameId, user, resultRecorded]);
+
+  // ── If game resets to lobby (player left mid-game), redirect everyone ─────────
+  useEffect(() => {
+    if (game?.status === "lobby") {
+      navigate(`/lobby/${gameId}`);
+    }
+  }, [game?.status, gameId, navigate]);
+
+  async function handleExitGame() {
+    if (!gameId || !user) return;
+    await leaveGame(gameId, user.uid);
+    navigate("/");
+  }
 
   // ── Capture government names when voting OPENS (needed for failed-vote overlay) ──
   useEffect(() => {
@@ -206,6 +221,35 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
+      {/* Exit confirmation modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <h2 className="text-lg font-bold text-white">Exit Game?</h2>
+            <p className="text-gray-400 text-sm">
+              Are you sure you want to exit the game?
+              {game && game.players.filter((id) => game.playerMap[id]?.isAlive).length - 1 >= 5
+                ? " The remaining players will be returned to the lobby to restart."
+                : " There won't be enough players to continue — the game will end for everyone."}
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl py-2.5 text-sm transition"
+              >
+                Cancel
+            </button>
+              <button
+                onClick={handleExitGame}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl py-2.5 text-sm transition"
+              >
+                Exit Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Role reveal modal */}
       {showRole && myRole && (
         <RoleCard
@@ -248,6 +292,14 @@ export default function GamePage() {
             </button>
           )}
           <span className="text-xs text-gray-500">Round {game.round}</span>
+          {game.phase !== "finished" && !game.isSoloMode && (
+            <button
+              onClick={() => setShowExitConfirm(true)}
+              className="text-xs bg-red-950 hover:bg-red-900 text-red-400 hover:text-red-300 border border-red-800/50 px-3 py-1 rounded-lg transition"
+            >
+              Exit
+            </button>
+          )}
         </div>
       </div>
 

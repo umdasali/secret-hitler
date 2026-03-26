@@ -1,9 +1,77 @@
 import { useEffect, useState } from "react";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
-import { Trophy, Medal, Shield, Zap, Eye, ArrowLeft } from "lucide-react";
+import { Shield, Zap, Skull, ArrowLeft } from "lucide-react";
 import { db } from "../firebase/config";
 import { useNavigate } from "react-router-dom";
 import type { LeaderboardEntry } from "../types/game";
+
+// ── Rank badge for top 3 ───────────────────────────────────────────────────
+function RankBadge({ rank }: { rank: number }) {
+  const configs = [
+    { roman: "I",   bg: "#7a5c10", border: "#c9a84c", text: "#ffd97a", size: 38 },
+    { roman: "II",  bg: "#3a3a3a", border: "#9ca3af", text: "#e5e7eb", size: 36 },
+    { roman: "III", bg: "#5c3010", border: "#c87a3a", text: "#f0a870", size: 34 },
+  ];
+  const cfg = configs[rank - 1];
+  return (
+    <div
+      className="flex items-center justify-center font-black select-none"
+      style={{
+        width: cfg.size + 4,
+        height: cfg.size + 4,
+        background: cfg.bg,
+        border: `2px solid ${cfg.border}`,
+        borderRadius: 4,
+        color: cfg.text,
+        fontSize: rank === 1 ? 15 : 13,
+        fontFamily: "Georgia, serif",
+        letterSpacing: "0.05em",
+        boxShadow: `0 0 8px ${cfg.border}55`,
+        flexShrink: 0,
+      }}
+    >
+      {cfg.roman}
+    </div>
+  );
+}
+
+// ── Decorative divider ─────────────────────────────────────────────────────
+function RuleDivider() {
+  return (
+    <div className="flex items-center gap-3 w-full my-1">
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(to right, transparent, #6b4e22)" }} />
+      <div style={{ width: 5, height: 5, background: "#c9a84c", transform: "rotate(45deg)" }} />
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(to left, transparent, #6b4e22)" }} />
+    </div>
+  );
+}
+
+// ── Corner bracket decoration ──────────────────────────────────────────────
+function CornerBrackets({ color = "#6b4e22", size = 10 }: { color?: string; size?: number }) {
+  const s = size;
+  const b = 2;
+  const style = (top: boolean, left: boolean) => ({
+    position: "absolute" as const,
+    top: top ? 0 : undefined,
+    bottom: top ? undefined : 0,
+    left: left ? 0 : undefined,
+    right: left ? undefined : 0,
+    width: s,
+    height: s,
+    borderTop:    top  ? `${b}px solid ${color}` : "none",
+    borderBottom: !top ? `${b}px solid ${color}` : "none",
+    borderLeft:   left ? `${b}px solid ${color}` : "none",
+    borderRight:  !left ? `${b}px solid ${color}` : "none",
+  });
+  return (
+    <>
+      <div style={style(true, true)} />
+      <div style={style(true, false)} />
+      <div style={style(false, true)} />
+      <div style={style(false, false)} />
+    </>
+  );
+}
 
 export default function LeaderboardPage() {
   const navigate = useNavigate();
@@ -37,76 +105,266 @@ export default function LeaderboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4">
+    <div
+      className="min-h-screen"
+      style={{
+        background: "radial-gradient(ellipse at top, #1c1208 0%, #0a0804 100%)",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      {/* ── Top navigation bar ───────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-4 px-6 py-3 border-b"
+        style={{ borderColor: "#3a2a14", background: "#0e0b05ee" }}
+      >
         <button
           onClick={() => navigate("/")}
-          className="text-gray-400 hover:text-white transition flex items-center gap-1 text-sm"
+          className="flex items-center gap-1.5 text-sm transition-all hover:opacity-80"
+          style={{ color: "#c9a84c", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
         >
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={14} />
+          RETREAT
         </button>
-        <h1 className="text-2xl font-bold text-yellow-500">Leaderboard</h1>
+        <div className="flex-1 h-px" style={{ background: "#3a2a14" }} />
+        <span
+          className="text-xs tracking-[0.3em] uppercase"
+          style={{ color: "#6b4e22", fontFamily: "Georgia, serif" }}
+        >
+          TOP SECRET
+        </span>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-10">
+
+        {/* ── Masthead ─────────────────────────────────────────────────── */}
+        <div className="text-center mb-8 relative">
+          {/* Top stamp line */}
+          <div
+            className="inline-block border px-4 py-0.5 mb-4 tracking-[0.45em] text-xs"
+            style={{
+              borderColor: "#8b1a1a",
+              color: "#8b1a1a",
+              fontFamily: "Georgia, serif",
+              transform: "rotate(-1.2deg)",
+            }}
+          >
+            CLASSIFIED
+          </div>
+
+          {/* Title */}
+          <h1
+            className="font-black uppercase leading-none"
+            style={{
+              fontSize: "clamp(26px, 7vw, 48px)",
+              color: "#d4c8a0",
+              fontFamily: "Georgia, serif",
+              letterSpacing: "0.18em",
+              textShadow: "0 2px 12px #00000080",
+            }}
+          >
+            HALL OF SHADOWS
+          </h1>
+
+          <RuleDivider />
+
+          <p
+            className="tracking-[0.35em] text-xs mt-1"
+            style={{ color: "#7a6a4a", fontFamily: "Georgia, serif" }}
+          >
+            FIELD OPERATIVES — VICTORY RECORD
+          </p>
+
+          {/* Decorative emblem */}
+          <div className="flex justify-center mt-4">
+            <div
+              className="relative flex items-center justify-center"
+              style={{
+                width: 56,
+                height: 56,
+                border: "2px solid #6b4e22",
+                borderRadius: "50%",
+                background: "#12100800",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 4,
+                  border: "1px dashed #4a3820",
+                  borderRadius: "50%",
+                }}
+              />
+              <span style={{ color: "#c9a84c", fontSize: 22, fontFamily: "Georgia, serif" }}>⚔</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Content ──────────────────────────────────────────────────── */}
         {loading ? (
-          <div className="text-center text-gray-500 py-20">Loading leaderboard…</div>
+          <div
+            className="text-center py-20 tracking-[0.2em] text-sm"
+            style={{ color: "#6b4e22", fontFamily: "Georgia, serif" }}
+          >
+            RETRIEVING DOSSIERS…
+          </div>
         ) : entries.length === 0 ? (
-          <div className="text-center text-gray-600 py-20">No games played yet.</div>
+          <div
+            className="text-center py-20 tracking-[0.2em] text-sm"
+            style={{ color: "#4a3820", fontFamily: "Georgia, serif" }}
+          >
+            NO OPERATIVES ON RECORD
+          </div>
         ) : (
           <div className="space-y-3">
             {entries.map((entry, idx) => {
+              const rank = idx + 1;
               const winRate =
                 entry.gamesPlayed > 0
                   ? Math.round((entry.wins / entry.gamesPlayed) * 100)
                   : 0;
-              const rankIcon =
-                idx === 0 ? <Trophy size={20} className="text-yellow-400" /> :
-                idx === 1 ? <Medal size={20} className="text-gray-300" /> :
-                idx === 2 ? <Medal size={20} className="text-amber-600" /> :
-                <span className="text-sm text-gray-500">#{idx + 1}</span>;
+
+              const isTop3 = rank <= 3;
+              const cardBg    = isTop3 ? "#1e180a" : "#130f07";
+              const cardBorder = rank === 1 ? "#c9a84c" : rank === 2 ? "#7a8490" : rank === 3 ? "#c87a3a" : "#2e2010";
+              const nameColor  = isTop3 ? "#e8d8a8" : "#b8a878";
 
               return (
                 <div
                   key={entry.uid}
-                  className={`flex items-center gap-4 bg-gray-900 border rounded-2xl px-5 py-4 ${
-                    idx < 3 ? "border-yellow-800" : "border-gray-800"
-                  }`}
+                  className="relative flex items-center gap-4 px-5 py-4"
+                  style={{
+                    background: cardBg,
+                    border: `1px solid ${cardBorder}`,
+                    borderRadius: 4,
+                    boxShadow: isTop3 ? `0 2px 16px ${cardBorder}22` : "none",
+                  }}
                 >
+                  <CornerBrackets color={cardBorder} size={isTop3 ? 10 : 7} />
+
                   {/* Rank */}
-                  <div className="w-10 flex justify-center items-center">
-                    {rankIcon}
+                  <div className="w-10 flex justify-center items-center flex-shrink-0">
+                    {isTop3 ? (
+                      <RankBadge rank={rank} />
+                    ) : (
+                      <span
+                        className="font-black"
+                        style={{
+                          color: "#4a3820",
+                          fontFamily: "Georgia, serif",
+                          fontSize: 13,
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        #{rank}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gray-700 flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-bold">
+                  {/* Avatar — styled as a dossier photo */}
+                  <div
+                    className="flex-shrink-0 flex items-center justify-center font-black text-sm overflow-hidden"
+                    style={{
+                      width: 42,
+                      height: 42,
+                      border: `2px solid ${cardBorder}`,
+                      background: "#0e0b05",
+                      color: "#c9a84c",
+                      fontFamily: "Georgia, serif",
+                      filter: "sepia(0.4)",
+                    }}
+                  >
                     {entry.photoURL ? (
-                      <img src={entry.photoURL} alt="" className="w-full h-full object-cover" />
+                      <img src={entry.photoURL} alt="" className="w-full h-full object-cover" style={{ filter: "sepia(0.3) contrast(1.1)" }} />
                     ) : (
                       entry.displayName[0]?.toUpperCase()
                     )}
                   </div>
 
-                  {/* Name + role wins */}
+                  {/* Name + role stats */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-white truncate">{entry.displayName}</p>
-                    <div className="flex gap-3 text-xs text-gray-500 mt-0.5">
-                      <span className="flex items-center gap-1"><Shield size={11} className="text-blue-400" />{entry.winsByRole.liberal}</span>
-                      <span className="flex items-center gap-1"><Zap size={11} className="text-red-400" />{entry.winsByRole.fascist}</span>
-                      <span className="flex items-center gap-1"><Eye size={11} className="text-gray-400" />{entry.winsByRole.hitler}</span>
+                    <p
+                      className="font-black truncate leading-tight"
+                      style={{
+                        color: nameColor,
+                        fontFamily: "Georgia, serif",
+                        letterSpacing: "0.06em",
+                        fontSize: 14,
+                      }}
+                    >
+                      {entry.displayName.toUpperCase()}
+                    </p>
+
+                    {/* Role wins */}
+                    <div className="flex gap-3 mt-1.5">
+                      <span
+                        className="flex items-center gap-1 text-xs"
+                        style={{ color: "#4a80b0", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        title="Liberal wins"
+                      >
+                        <Shield size={10} strokeWidth={2} />
+                        {entry.winsByRole.liberal}
+                      </span>
+                      <span
+                        className="flex items-center gap-1 text-xs"
+                        style={{ color: "#b03a2a", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        title="Fascist wins"
+                      >
+                        <Zap size={10} strokeWidth={2} />
+                        {entry.winsByRole.fascist}
+                      </span>
+                      <span
+                        className="flex items-center gap-1 text-xs"
+                        style={{ color: "#6a5a5a", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        title="Hitler wins"
+                      >
+                        <Skull size={10} strokeWidth={2} />
+                        {entry.winsByRole.hitler}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="text-right space-y-0.5">
-                    <p className="text-white font-bold text-lg">{entry.wins}</p>
-                    <p className="text-gray-600 text-xs">{entry.gamesPlayed} games</p>
-                    <p className="text-yellow-600 text-xs font-semibold">{winRate}% win rate</p>
+                  {/* Right-side stats */}
+                  <div className="text-right flex-shrink-0">
+                    <p
+                      className="font-black leading-none"
+                      style={{
+                        fontSize: 22,
+                        color: isTop3 ? "#c9a84c" : "#6b4e22",
+                        fontFamily: "Georgia, serif",
+                      }}
+                    >
+                      {entry.wins}
+                    </p>
+                    <p
+                      className="text-xs mt-0.5 tracking-[0.08em]"
+                      style={{ color: "#4a3820", fontFamily: "Georgia, serif" }}
+                    >
+                      {entry.gamesPlayed} OPS
+                    </p>
+                    <p
+                      className="text-xs font-black tracking-[0.06em]"
+                      style={{
+                        color: winRate >= 60 ? "#b09030" : winRate >= 40 ? "#7a6a4a" : "#4a3820",
+                        fontFamily: "Georgia, serif",
+                      }}
+                    >
+                      {winRate}%
+                    </p>
                   </div>
                 </div>
               );
             })}
+
+            {/* Footer stamp */}
+            <div className="text-center pt-6">
+              <RuleDivider />
+              <p
+                className="mt-3 text-xs tracking-[0.35em] uppercase"
+                style={{ color: "#3a2810", fontFamily: "Georgia, serif" }}
+              >
+                Compiled by order of the party — do not distribute
+              </p>
+            </div>
           </div>
         )}
       </div>
