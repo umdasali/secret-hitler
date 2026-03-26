@@ -6,6 +6,7 @@ import {
   collection,
   increment,
   arrayUnion,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import type { Game, Player, Policy, PrivateRole } from "../types/game";
@@ -124,108 +125,110 @@ export async function castVote(
 ): Promise<void> {
   const ref = doc(db, "games", gameId);
 
-  // Step 1: Guard check — bail early if voting is no longer open
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  const game = snap.data() as Game;
-  if (!game.votingOpen || game.phase !== "election") return;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const game = snap.data() as Game;
 
-  // Step 2: Write just this player's vote atomically
-  await updateDoc(ref, { [`votes.${uid}`]: vote });
+    // Bail if voting window is already closed
+    if (!game.votingOpen || game.phase !== "election") return;
 
-  // Step 3: Re-read fresh state to see all concurrent votes
-  const freshSnap = await getDoc(ref);
-  if (!freshSnap.exists()) return;
-  const fresh = freshSnap.data() as Game;
+    const newVotes = { ...game.votes, [uid]: vote };
+    const alivePlayers = game.players.filter((id) => game.playerMap[id]?.isAlive);
+    const allVoted = alivePlayers.every((id) => id in newVotes);
 
-  // If another caller already tallied, bail
-  if (!fresh.votingOpen || fresh.phase !== "election") return;
-
-  const alivePlayers = fresh.players.filter((id) => fresh.playerMap[id]?.isAlive);
-  const allVoted = alivePlayers.every((id) => id in fresh.votes);
-  if (!allVoted) return;
-
-  // Step 4: Tally using fresh state
-  const jaCount = Object.values(fresh.votes).filter(Boolean).length;
-  const majority = jaCount > alivePlayers.length / 2;
-
-  if (majority) {
-    // Government formed — check if Hitler is elected as Chancellor with 3+ fascist policies
-    const roleSnap = await getDoc(doc(db, "games", gameId, "roles", fresh.nominatedChancellor!));
-    const role = roleSnap.exists() ? (roleSnap.data() as PrivateRole).role : null;
-
-    if (role === "hitler" && fresh.fascistPolicies >= 3) {
-      await updateDoc(ref, {
-        votingOpen: false,
-        winner: "fascist",
-        winReason: "Hitler was elected Chancellor",
-        phase: "finished",
-        status: "finished",
-      });
+    if (!allVoted) {
+      // Record just this player's vote; another caller will tally once all are in
+      tx.update(ref, { [`votes.${uid}`]: vote });
       return;
     }
 
-    // Draw 3 policies
-    const { draw, discard } = ensureDeck(fresh.drawPile, fresh.discardPile);
-    const drawnPolicies = draw.slice(0, 3);
-    const remaining = draw.slice(3);
+    // ── All voted — tally ──────────────────────────────────────────────────
+    const jaCount = Object.values(newVotes).filter(Boolean).length;
+    const majority = jaCount > alivePlayers.length / 2;
 
-    await updateDoc(ref, {
-      votingOpen: false,
-      electionTracker: 0,
-      lastPresidentUid: fresh.players[fresh.presidentIndex],
-      lastChancellorUid: fresh.nominatedChancellor,
-      drawnPolicies,
-      drawPile: remaining,
-      discardPile: discard,
-      phase: "legislative",
-    });
-  } else {
-    // Failed election — advance tracker
-    const newTracker = fresh.electionTracker + 1;
+    if (majority) {
+      // Check Hitler-as-Chancellor win condition (read inside tx so it's atomic)
+      const roleRef = doc(db, "games", gameId, "roles", game.nominatedChancellor!);
+      const roleSnap = await tx.get(roleRef);
+      const role = roleSnap.exists() ? (roleSnap.data() as PrivateRole).role : null;
 
-    if (newTracker >= 3) {
-      // Chaos: enact top policy automatically
-      const { draw, discard } = ensureDeck(fresh.drawPile, fresh.discardPile);
-      const enacted = draw[0] as Policy;
-      const isLib = enacted === "L";
-      const newLib = fresh.liberalPolicies + (isLib ? 1 : 0);
-      const newFas = fresh.fascistPolicies + (isLib ? 0 : 1);
-      const { winner, reason } = checkWin({ liberalPolicies: newLib, fascistPolicies: newFas });
+      if (role === "hitler" && game.fascistPolicies >= 3) {
+        tx.update(ref, {
+          [`votes.${uid}`]: vote,
+          votingOpen: false,
+          winner: "fascist",
+          winReason: "Hitler was elected Chancellor",
+          phase: "finished",
+          status: "finished",
+        });
+        return;
+      }
 
-      const nextPresidentIndex = nextAlivePresidentIndex(fresh.presidentIndex, fresh.players, fresh.playerMap);
+      // Draw 3 policies for the legislative session
+      const { draw, discard } = ensureDeck(game.drawPile, game.discardPile);
+      const drawnPolicies = draw.slice(0, 3);
+      const remaining = draw.slice(3);
 
-      await updateDoc(ref, {
+      tx.update(ref, {
+        [`votes.${uid}`]: vote,
         votingOpen: false,
         electionTracker: 0,
-        liberalPolicies: newLib,
-        fascistPolicies: newFas,
-        drawPile: draw.slice(1),
+        lastPresidentUid: game.players[game.presidentIndex],
+        lastChancellorUid: game.nominatedChancellor,
+        drawnPolicies,
+        drawPile: remaining,
         discardPile: discard,
-        nominatedChancellor: null,
-        lastPresidentUid: null,
-        lastChancellorUid: null,
-        presidentIndex: nextPresidentIndex,
-        round: fresh.round + 1,
-        phase: winner ? "finished" : "election",
-        status: winner ? "finished" : "in_progress",
-        winner: winner ?? null,
-        winReason: reason ?? null,
+        phase: "legislative",
       });
-      return;
+    } else {
+      // Failed election — advance tracker
+      const newTracker = game.electionTracker + 1;
+
+      if (newTracker >= 3) {
+        // Chaos: enact top policy automatically
+        const { draw, discard } = ensureDeck(game.drawPile, game.discardPile);
+        const enacted = draw[0] as Policy;
+        const isLib = enacted === "L";
+        const newLib = game.liberalPolicies + (isLib ? 1 : 0);
+        const newFas = game.fascistPolicies + (isLib ? 0 : 1);
+        const { winner, reason } = checkWin({ liberalPolicies: newLib, fascistPolicies: newFas });
+        const nextPres = nextAlivePresidentIndex(game.presidentIndex, game.players, game.playerMap);
+
+        tx.update(ref, {
+          [`votes.${uid}`]: vote,
+          votingOpen: false,
+          electionTracker: 0,
+          liberalPolicies: newLib,
+          fascistPolicies: newFas,
+          drawPile: draw.slice(1),
+          discardPile: discard,
+          nominatedChancellor: null,
+          lastPresidentUid: null,
+          lastChancellorUid: null,
+          presidentIndex: nextPres,
+          round: game.round + 1,
+          phase: winner ? "finished" : "election",
+          status: winner ? "finished" : "in_progress",
+          winner: winner ?? null,
+          winReason: reason ?? null,
+        });
+        return;
+      }
+
+      const nextPres = nextAlivePresidentIndex(game.presidentIndex, game.players, game.playerMap);
+
+      tx.update(ref, {
+        [`votes.${uid}`]: vote,
+        votingOpen: false,
+        electionTracker: newTracker,
+        nominatedChancellor: null,
+        presidentIndex: nextPres,
+        round: game.round + 1,
+        phase: "election",
+      });
     }
-
-    const nextPresidentIndex = nextAlivePresidentIndex(fresh.presidentIndex, fresh.players, fresh.playerMap);
-
-    await updateDoc(ref, {
-      votingOpen: false,
-      electionTracker: newTracker,
-      nominatedChancellor: null,
-      presidentIndex: nextPresidentIndex,
-      round: fresh.round + 1,
-      phase: "election",
-    });
-  }
+  });
 }
 
 // ─── President Discards ───────────────────────────────────────────────────────
@@ -344,9 +347,15 @@ export async function executePower(
       return;
     }
 
+    // Advance presidency using the updated map so the executed player is skipped
+    const nextPres = nextAlivePresidentIndex(game.presidentIndex, game.players, updatedPlayerMap);
+
     await updateDoc(ref, {
       playerMap: updatedPlayerMap,
       pendingPower: null,
+      nominatedChancellor: null,
+      presidentIndex: nextPres,
+      round: game.round + 1,
       phase: "election",
     });
   } else if (power === "special_election") {
