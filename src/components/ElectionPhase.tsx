@@ -205,7 +205,7 @@ function PlayerBadge({
   };
   return (
     <div className={`text-xs px-2 py-1 rounded-lg truncate flex items-center gap-1 ${styles[color]}`}>
-      {isBot && <Bot size={10} />}{name.split(" ")[0]}
+      {isBot && <Bot size={10} />}{name}
     </div>
   );
 }

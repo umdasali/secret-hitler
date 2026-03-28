@@ -6,6 +6,41 @@ import { useAuth } from "../context/AuthContext";
 import { startGame, leaveLobby } from "../lib/gameActions";
 import type { Game } from "../types/game";
 
+function RuleDivider() {
+  return (
+    <div className="flex items-center gap-3 w-full my-1">
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(to right, transparent, #6b4e22)" }} />
+      <div style={{ width: 5, height: 5, background: "#c9a84c", transform: "rotate(45deg)", flexShrink: 0 }} />
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(to left, transparent, #6b4e22)" }} />
+    </div>
+  );
+}
+
+function CornerBrackets({ color = "#6b4e22", size = 10 }: { color?: string; size?: number }) {
+  const b = 2;
+  const corner = (top: boolean, left: boolean) => ({
+    position: "absolute" as const,
+    top: top ? 0 : undefined,
+    bottom: top ? undefined : 0,
+    left: left ? 0 : undefined,
+    right: left ? undefined : 0,
+    width: size,
+    height: size,
+    borderTop:    top  ? `${b}px solid ${color}` : "none",
+    borderBottom: !top ? `${b}px solid ${color}` : "none",
+    borderLeft:   left ? `${b}px solid ${color}` : "none",
+    borderRight:  !left ? `${b}px solid ${color}` : "none",
+  });
+  return (
+    <>
+      <div style={corner(true, true)} />
+      <div style={corner(true, false)} />
+      <div style={corner(false, true)} />
+      <div style={corner(false, false)} />
+    </>
+  );
+}
+
 export default function LobbyPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
@@ -14,6 +49,7 @@ export default function LobbyPage() {
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!gameId) return;
@@ -21,9 +57,7 @@ export default function LobbyPage() {
       if (!snap.exists()) { navigate("/"); return; }
       const g = snap.data() as Game;
       setGame(g);
-      if (g.status === "in_progress") {
-        navigate(`/game/${gameId}`);
-      }
+      if (g.status === "in_progress") navigate(`/game/${gameId}`);
     });
     return unsub;
   }, [gameId, navigate]);
@@ -46,10 +80,21 @@ export default function LobbyPage() {
     }
   }
 
+  function handleCopy() {
+    navigator.clipboard.writeText(gameId ?? "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   if (!game) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-500">Loading lobby…</p>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "radial-gradient(ellipse at top, #1c1208 0%, #0a0804 100%)" }}
+      >
+        <p style={{ color: "#6b4e22", fontFamily: "Georgia, serif", letterSpacing: "0.15em", fontSize: 13 }}>
+          RETRIEVING ORDERS…
+        </p>
       </div>
     );
   }
@@ -57,112 +102,355 @@ export default function LobbyPage() {
   const isHost = user?.uid === game.hostUid;
   const playerCount = game.players.length;
   const canStart = isHost && playerCount >= 5;
+  const needed = Math.max(0, 5 - playerCount);
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4 py-10 space-y-8">
-
-      {/* Exit confirmation modal */}
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        background: "radial-gradient(ellipse at top, #1c1208 0%, #0a0804 100%)",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      {/* ── Exit confirmation modal ────────────────────────────────────── */}
       {showExitConfirm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-white">Exit Lobby?</h2>
-            <p className="text-gray-400 text-sm">
-              {game?.hostUid === user?.uid
-                ? "You are the host. Leaving will transfer host to the next player."
-                : "You will be removed from this lobby."}
+          <div
+            className="relative w-full max-w-sm p-5 space-y-4"
+            style={{ background: "#130f07", border: "1px solid #6b4e22", borderRadius: 4 }}
+          >
+            <CornerBrackets color="#c9a84c" size={10} />
+            <h2 className="font-black tracking-[0.08em] uppercase" style={{ color: "#d4c8a0", fontFamily: "Georgia, serif", fontSize: 15 }}>
+              Abort Mission?
+            </h2>
+            <p style={{ color: "#7a6a4a", fontFamily: "Georgia, serif", fontSize: 13, lineHeight: 1.6 }}>
+              {game.hostUid === user?.uid
+                ? "You are the commanding officer. Leaving will transfer command to the next agent."
+                : "You will be removed from the staging area."}
             </p>
             <div className="flex gap-3 pt-1">
               <button
                 onClick={() => setShowExitConfirm(false)}
-                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl py-2.5 text-sm transition"
+                className="flex-1 font-black tracking-wider py-2.5 text-xs transition-all hover:opacity-80"
+                style={{ background: "#1e180a", border: "1px solid #4a3820", color: "#7a6a4a", fontFamily: "Georgia, serif", borderRadius: 3 }}
               >
-                Cancel
+                STAND DOWN
               </button>
               <button
                 onClick={handleExit}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl py-2.5 text-sm transition"
+                className="flex-1 font-black tracking-wider py-2.5 text-xs transition-all hover:opacity-80"
+                style={{ background: "#3a0a0a", border: "1px solid #8b1a1a", color: "#e05050", fontFamily: "Georgia, serif", borderRadius: 3 }}
               >
-                Exit
+                ABORT
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="text-center space-y-1">
-        <h1 className="text-4xl font-bold text-red-500">Game Lobby</h1>
-        <p className="text-gray-400 text-sm">Share this code with your friends</p>
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <span className="font-mono text-xl bg-gray-800 px-4 py-2 rounded-lg text-white tracking-widest">
-            {gameId}
-          </span>
-          <button
-            onClick={() => navigator.clipboard.writeText(gameId ?? "")}
-            className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-2 rounded-lg transition"
-          >
-            Copy
-          </button>
-        </div>
-      </div>
-
-      {/* Players */}
-      <div className="w-full max-w-md bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-3">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="font-semibold text-white">Players</h2>
-          <span className="text-sm text-gray-500">{playerCount} / 10</span>
-        </div>
-        {game.players.map((uid) => {
-          const p = game.playerMap[uid];
-          return (
-            <div
-              key={uid}
-              className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-3"
-            >
-              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold text-white overflow-hidden">
-                {p?.photoURL ? (
-                  <img src={p.photoURL} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  p?.displayName?.[0]?.toUpperCase() ?? "?"
-                )}
-              </div>
-              <span className="text-gray-200 text-sm flex-1">{p?.displayName ?? uid}</span>
-              {uid === game.hostUid && (
-                <span className="text-xs text-yellow-500 font-semibold">HOST</span>
-              )}
-              {uid === user?.uid && (
-                <span className="text-xs text-blue-400 font-semibold">YOU</span>
-              )}
-            </div>
-          );
-        })}
-
-        {playerCount < 5 && (
-          <p className="text-center text-gray-600 text-xs pt-2">
-            Need at least 5 players to start ({5 - playerCount} more needed)
-          </p>
-        )}
-      </div>
-
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-
-      <div className="flex flex-col items-center gap-3 w-full max-w-md">
-        {isHost ? (
-          <button
-            onClick={handleStart}
-            disabled={!canStart || starting}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold rounded-xl px-10 py-4 text-lg transition"
-          >
-            {starting ? "Starting…" : "Start Game"}
-          </button>
-        ) : (
-          <p className="text-gray-500 text-sm">Waiting for the host to start…</p>
-        )}
+      {/* ── Nav bar ───────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b flex-shrink-0"
+        style={{ borderColor: "#3a2a14", background: "#0e0b05ee" }}
+      >
         <button
           onClick={() => setShowExitConfirm(true)}
-          className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 font-semibold rounded-xl px-10 py-3 text-sm transition border border-gray-700"
+          className="flex items-center gap-1 text-sm transition-all hover:opacity-80 flex-shrink-0"
+          style={{ color: "#c9a84c", fontFamily: "Georgia, serif", letterSpacing: "0.04em" }}
         >
-          Exit Lobby
+          ← <span className="hidden xs:inline">RETREAT</span><span className="xs:hidden">BACK</span>
         </button>
+        <div className="flex-1 h-px" style={{ background: "#3a2a14" }} />
+        <span
+          className="text-xs tracking-[0.15em] sm:tracking-[0.25em] uppercase flex-shrink-0"
+          style={{ color: "#6b4e22", fontFamily: "Georgia, serif" }}
+        >
+          STAGING AREA
+        </span>
+      </div>
+
+      {/* ── Main content ──────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 py-5 sm:py-8 gap-4 sm:gap-6 overflow-x-hidden">
+
+        {/* Masthead */}
+        <div className="text-center w-full max-w-md">
+          <div
+            className="inline-block border px-3 py-0.5 mb-2 text-xs"
+            style={{
+              borderColor: "#8b1a1a",
+              color: "#8b1a1a",
+              fontFamily: "Georgia, serif",
+              letterSpacing: "0.25em",
+              transform: "rotate(-1.2deg)",
+            }}
+          >
+            CLASSIFIED
+          </div>
+          <h1
+            className="font-black uppercase leading-tight block"
+            style={{
+              fontSize: "clamp(18px, 5.5vw, 36px)",
+              color: "#d4c8a0",
+              fontFamily: "Georgia, serif",
+              letterSpacing: "clamp(0.06em, 2vw, 0.18em)",
+              textShadow: "0 2px 12px #00000080",
+            }}
+          >
+            PRE-MISSION BRIEFING
+          </h1>
+          <RuleDivider />
+          <p
+            className="text-xs mt-1"
+            style={{ color: "#7a6a4a", fontFamily: "Georgia, serif", letterSpacing: "0.1em" }}
+          >
+            AWAIT ORDERS FROM COMMANDING OFFICER
+          </p>
+        </div>
+
+        {/* Mission code */}
+        <div
+          className="relative w-full max-w-md p-4 sm:p-5"
+          style={{ border: "1px solid #4a3820", borderRadius: 4 }}
+        >
+          <CornerBrackets color="#6b4e22" size={9} />
+          <p
+            className="text-xs uppercase mb-2"
+            style={{ color: "#6b4e22", fontFamily: "Georgia, serif", letterSpacing: "0.2em" }}
+          >
+            Mission Code
+          </p>
+          <div className="flex items-center gap-2">
+            <span
+              className="flex-1 text-center py-2.5 font-black overflow-hidden"
+              style={{
+                background: "#0e0b05",
+                border: "1px solid #8b1a1a",
+                color: "#e8d4a0",
+                fontFamily: "Georgia, serif",
+                borderRadius: 3,
+                fontSize: "clamp(13px, 3.5vw, 20px)",
+                letterSpacing: "clamp(0.08em, 1.5vw, 0.3em)",
+                wordBreak: "break-all",
+              }}
+            >
+              {gameId}
+            </span>
+            <button
+              onClick={handleCopy}
+              className="font-black text-xs transition-all hover:opacity-80 flex-shrink-0"
+              style={{
+                background: copied ? "#1a3a1a" : "#1e180a",
+                border: `1px solid ${copied ? "#3a8a3a" : "#6b4e22"}`,
+                color: copied ? "#6aaa6a" : "#c9a84c",
+                fontFamily: "Georgia, serif",
+                borderRadius: 3,
+                padding: "10px 14px",
+                letterSpacing: "0.1em",
+              }}
+            >
+              {copied ? "✓" : "COPY"}
+            </button>
+          </div>
+          <p
+            className="text-xs mt-2"
+            style={{ color: "#4a3820", fontFamily: "Georgia, serif", letterSpacing: "0.06em" }}
+          >
+            Transmit this code to your operatives
+          </p>
+        </div>
+
+        {/* Agents roster */}
+        <div
+          className="relative w-full max-w-md p-4 sm:p-5 space-y-2 sm:space-y-3"
+          style={{ border: "1px solid #3a2a14", borderRadius: 4 }}
+        >
+          <CornerBrackets color="#4a3820" size={9} />
+
+          <div className="flex items-center justify-between">
+            <p
+              className="text-xs uppercase"
+              style={{ color: "#6b4e22", fontFamily: "Georgia, serif", letterSpacing: "0.18em" }}
+            >
+              Agents Assembled
+            </p>
+            <span
+              className="text-xs font-black"
+              style={{ color: playerCount >= 5 ? "#c9a84c" : "#6b4e22", fontFamily: "Georgia, serif" }}
+            >
+              {playerCount} / 10
+            </span>
+          </div>
+
+          <RuleDivider />
+
+          <div className="space-y-1.5">
+            {game.players.map((uid, idx) => {
+              const p = game.playerMap[uid];
+              const isThisHost = uid === game.hostUid;
+              const isMe = uid === user?.uid;
+
+              return (
+                <div
+                  key={uid}
+                  className="relative flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2"
+                  style={{
+                    background: isMe ? "#1e180a" : "transparent",
+                    border: `1px solid ${isMe ? "#6b4e22" : "#2e2010"}`,
+                    borderRadius: 3,
+                  }}
+                >
+                  {/* Number */}
+                  <span
+                    className="font-black w-5 text-right flex-shrink-0"
+                    style={{ color: "#4a3820", fontFamily: "Georgia, serif", fontSize: 11 }}
+                  >
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+
+                  {/* Avatar */}
+                  <div
+                    className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0 flex items-center justify-center text-xs font-black overflow-hidden"
+                    style={{
+                      border: `1px solid ${isThisHost ? "#c9a84c" : "#4a3820"}`,
+                      background: "#0e0b05",
+                      color: "#c9a84c",
+                      fontFamily: "Georgia, serif",
+                      filter: "sepia(0.3)",
+                    }}
+                  >
+                    {p?.photoURL ? (
+                      <img src={p.photoURL} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      p?.displayName?.[0]?.toUpperCase() ?? "?"
+                    )}
+                  </div>
+
+                  {/* Name */}
+                  <span
+                    className="flex-1 font-black truncate min-w-0"
+                    style={{
+                      color: isMe ? "#e8d8a8" : "#b8a878",
+                      fontFamily: "Georgia, serif",
+                      letterSpacing: "0.04em",
+                      fontSize: "clamp(11px, 3vw, 14px)",
+                    }}
+                  >
+                    {p?.displayName?.toUpperCase() ?? uid}
+                  </span>
+
+                  {/* Badges */}
+                  <div className="flex gap-1 flex-shrink-0">
+                    {isThisHost && (
+                      <span
+                        className="text-[9px] font-black tracking-wider px-1.5 py-0.5"
+                        style={{
+                          color: "#c9a84c",
+                          background: "#1e180a",
+                          border: "1px solid #6b4e22",
+                          borderRadius: 2,
+                          fontFamily: "Georgia, serif",
+                        }}
+                      >
+                        C.O.
+                      </span>
+                    )}
+                    {isMe && (
+                      <span
+                        className="text-[9px] font-black tracking-wider px-1.5 py-0.5"
+                        style={{
+                          color: "#4a80b0",
+                          background: "#0a1020",
+                          border: "1px solid #2a5080",
+                          borderRadius: 2,
+                          fontFamily: "Georgia, serif",
+                        }}
+                      >
+                        YOU
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {needed > 0 && (
+            <p
+              className="text-center text-xs pt-1"
+              style={{ color: "#4a3820", fontFamily: "Georgia, serif", letterSpacing: "0.08em" }}
+            >
+              {needed} MORE OPERATIVE{needed !== 1 ? "S" : ""} NEEDED
+            </p>
+          )}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p
+            className="text-xs text-center"
+            style={{ color: "#e05050", fontFamily: "Georgia, serif", letterSpacing: "0.08em" }}
+          >
+            {error}
+          </p>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex flex-col items-center gap-3 w-full max-w-md pb-4">
+          {isHost ? (
+            <button
+              onClick={handleStart}
+              disabled={!canStart || starting}
+              className="w-full py-4 font-black uppercase transition-all hover:opacity-90 disabled:opacity-30"
+              style={{
+                background: canStart && !starting ? "#3a0a0a" : "#1a1208",
+                border: `1px solid ${canStart && !starting ? "#c94228" : "#4a3820"}`,
+                color: canStart && !starting ? "#e8c0b0" : "#4a3820",
+                fontFamily: "Georgia, serif",
+                borderRadius: 3,
+                fontSize: "clamp(11px, 2.8vw, 14px)",
+                letterSpacing: "clamp(0.08em, 1.5vw, 0.18em)",
+                boxShadow: canStart && !starting ? "0 0 20px #c9422820" : "none",
+              }}
+            >
+              {starting ? "MOBILISING FORCES…" : "COMMENCE OPERATION"}
+            </button>
+          ) : (
+            <div
+              className="w-full py-3 text-center text-xs"
+              style={{
+                color: "#4a3820",
+                fontFamily: "Georgia, serif",
+                letterSpacing: "0.1em",
+                border: "1px dashed #2e2010",
+                borderRadius: 3,
+              }}
+            >
+              AWAITING C.O.'S ORDER…
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowExitConfirm(true)}
+            className="w-full py-3 font-black uppercase text-xs transition-all hover:opacity-80"
+            style={{
+              background: "transparent",
+              border: "1px solid #2e2010",
+              color: "#4a3820",
+              fontFamily: "Georgia, serif",
+              borderRadius: 3,
+              letterSpacing: "0.12em",
+            }}
+          >
+            ABORT MISSION
+          </button>
+        </div>
+
+        <p
+          className="text-xs pb-2"
+          style={{ color: "#2e2010", fontFamily: "Georgia, serif", letterSpacing: "0.08em" }}
+        >
+          OPERATION: SECRET HITLER — EYES ONLY
+        </p>
       </div>
     </div>
   );

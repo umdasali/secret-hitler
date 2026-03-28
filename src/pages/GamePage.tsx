@@ -317,7 +317,7 @@ export default function GamePage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[9px] font-black text-yellow-500 uppercase tracking-widest leading-none mb-0.5">President</p>
                   <p className="text-yellow-100 text-sm font-semibold truncate">
-                    {game.playerMap[presidentUid]?.displayName?.split(" ")[0] ?? "—"}
+                    {game.playerMap[presidentUid]?.displayName ?? "—"}
                     {presidentUid === user.uid && <span className="text-yellow-600 text-xs"> (you)</span>}
                   </p>
                 </div>
@@ -334,7 +334,7 @@ export default function GamePage() {
                         {game.phase === "election" ? "Nominated" : "Chancellor"}
                       </p>
                       <p className="text-blue-100 text-sm font-semibold truncate">
-                        {game.playerMap[cUid]?.displayName?.split(" ")[0] ?? "—"}
+                        {game.playerMap[cUid]?.displayName ?? "—"}
                         {cUid === user.uid && <span className="text-blue-600 text-xs"> (you)</span>}
                       </p>
                     </div>
@@ -407,7 +407,7 @@ export default function GamePage() {
                     <p className={`text-sm font-semibold truncate leading-tight ${
                       alive ? (isP ? "text-yellow-100" : isC ? "text-blue-100" : "text-gray-200") : "text-gray-600 line-through"
                     }`}>
-                      {p?.displayName?.split(" ")[0] ?? "?"}
+                      {p?.displayName ?? "?"}
                       {isMe && <span className="text-gray-500 font-normal text-xs"> (you)</span>}
                     </p>
                     {alive && isP && (
@@ -441,7 +441,7 @@ export default function GamePage() {
 
           <div className="w-full max-w-2xl bg-gray-900 border border-gray-800 rounded-2xl p-6">
             {game.phase === "finished" ? (
-              <FinishedScreen game={game} navigate={navigate} />
+              <FinishedScreen game={game} gameId={gameId!} navigate={navigate} />
             ) : !isAlive ? (
               <div className="text-center py-8 text-gray-500">
                 <Skull size={48} className="mx-auto mb-3 text-gray-600" />
@@ -637,35 +637,130 @@ function VoteResultOverlay({
 
 // ─── Finished Screen ──────────────────────────────────────────────────────────
 
-function FinishedScreen({ game, navigate }: { game: Game; navigate: (path: string) => void }) {
+function FinishedScreen({
+  game,
+  gameId,
+  navigate,
+}: {
+  game: Game;
+  gameId: string;
+  navigate: (path: string) => void;
+}) {
+  const [allRoles, setAllRoles] = useState<Record<string, PrivateRole>>({});
+
+  useEffect(() => {
+    fetchAllRoles(gameId, game.players).then(setAllRoles);
+  }, [gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isLibWin = game.winner === "liberal";
+
+  const liberals = game.players.filter((uid) => allRoles[uid]?.role === "liberal");
+  const fascists = game.players.filter((uid) => allRoles[uid]?.role === "fascist");
+  const hitlerUid = game.players.find((uid) => allRoles[uid]?.role === "hitler");
+  const rolesLoaded = Object.keys(allRoles).length > 0;
+
   return (
-    <div className="text-center space-y-4 py-6">
-      <div className="flex justify-center">
-        {isLibWin
-          ? <Shield size={64} className="text-blue-400" />
-          : <Zap size={64} className="text-red-400" />}
+    <div className="space-y-6 py-4">
+      {/* Winner banner */}
+      <div className="text-center space-y-2">
+        <div className="flex justify-center">
+          {isLibWin
+            ? <Shield size={56} className="text-blue-400" />
+            : <Zap size={56} className="text-red-400" />}
+        </div>
+        <h2 className={`text-3xl font-black ${isLibWin ? "text-blue-400" : "text-red-400"}`}>
+          {isLibWin ? "Liberals Win!" : "Fascists Win!"}
+        </h2>
+        <p className="text-gray-400 text-sm">{game.winReason}</p>
       </div>
-      <h2 className={`text-3xl font-black ${isLibWin ? "text-blue-400" : "text-red-400"}`}>
-        {isLibWin ? "Liberals Win!" : "Fascists Win!"}
-      </h2>
-      <p className="text-gray-400">{game.winReason}</p>
-      <div className="flex gap-3 justify-center pt-2">
+
+      {/* Team reveal */}
+      {rolesLoaded && (
+        <div className="space-y-2">
+          <p className="text-center text-xs font-black tracking-widest text-gray-500 uppercase">— Team Reveal —</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Liberals */}
+            <div className="bg-blue-950/40 border border-blue-800/50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Shield size={13} className="text-blue-400" />
+                <span className="text-xs font-black text-blue-400 tracking-widest uppercase">Liberal Party</span>
+              </div>
+              {liberals.length === 0 && <p className="text-xs text-gray-600 italic">None</p>}
+              {liberals.map((uid) => {
+                const p = game.playerMap[uid];
+                const alive = p?.isAlive ?? false;
+                return (
+                  <div key={uid} className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-900 flex items-center justify-center text-[10px] font-bold text-blue-300 flex-shrink-0 overflow-hidden">
+                      {p?.photoURL ? <img src={p.photoURL} alt="" className="w-full h-full object-cover" /> : p?.displayName?.[0]?.toUpperCase()}
+                    </div>
+                    <span className={`text-sm flex-1 truncate ${alive ? "text-blue-100" : "text-gray-600 line-through"}`}>
+                      {p?.displayName ?? uid}
+                    </span>
+                    {!alive && <Skull size={11} className="text-gray-600 flex-shrink-0" />}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Fascists + Hitler */}
+            <div className="bg-red-950/40 border border-red-800/50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Zap size={13} className="text-red-400" />
+                <span className="text-xs font-black text-red-400 tracking-widest uppercase">Fascist Regime</span>
+              </div>
+
+              {/* Hitler */}
+              {hitlerUid && (() => {
+                const p = game.playerMap[hitlerUid];
+                const alive = p?.isAlive ?? false;
+                return (
+                  <div key={hitlerUid} className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-red-900 flex items-center justify-center text-[10px] font-bold text-red-300 flex-shrink-0 overflow-hidden">
+                      {p?.photoURL ? <img src={p.photoURL} alt="" className="w-full h-full object-cover" /> : p?.displayName?.[0]?.toUpperCase()}
+                    </div>
+                    <span className={`text-sm flex-1 truncate ${alive ? "text-red-100" : "text-gray-600 line-through"}`}>
+                      {p?.displayName ?? hitlerUid}
+                    </span>
+                    <span className="text-[9px] font-black tracking-widest text-red-500 bg-red-950 border border-red-800 px-1 rounded">HITLER</span>
+                    {!alive && <Skull size={11} className="text-gray-600 flex-shrink-0" />}
+                  </div>
+                );
+              })()}
+
+              {/* Fascists */}
+              {fascists.length === 0 && !hitlerUid && <p className="text-xs text-gray-600 italic">None</p>}
+              {fascists.map((uid) => {
+                const p = game.playerMap[uid];
+                const alive = p?.isAlive ?? false;
+                return (
+                  <div key={uid} className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-red-900 flex items-center justify-center text-[10px] font-bold text-red-300 flex-shrink-0 overflow-hidden">
+                      {p?.photoURL ? <img src={p.photoURL} alt="" className="w-full h-full object-cover" /> : p?.displayName?.[0]?.toUpperCase()}
+                    </div>
+                    <span className={`text-sm flex-1 truncate ${alive ? "text-red-100" : "text-gray-600 line-through"}`}>
+                      {p?.displayName ?? uid}
+                    </span>
+                    {!alive && <Skull size={11} className="text-gray-600 flex-shrink-0" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-3 justify-center pt-1 flex-wrap">
         <button
           onClick={() => navigate(game.isSoloMode ? "/solo" : "/")}
-          className="bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl px-6 py-3 transition"
+          className="bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl px-6 py-2.5 text-sm transition"
         >
           {game.isSoloMode ? "Play Again" : "Home"}
         </button>
         <button
-          onClick={() => navigate("/")}
-          className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl px-6 py-3 transition"
-        >
-          Home
-        </button>
-        <button
           onClick={() => navigate("/leaderboard")}
-          className="bg-yellow-700 hover:bg-yellow-600 text-white font-semibold rounded-xl px-6 py-3 transition"
+          className="bg-yellow-700 hover:bg-yellow-600 text-white font-semibold rounded-xl px-6 py-2.5 text-sm transition"
         >
           Leaderboard
         </button>

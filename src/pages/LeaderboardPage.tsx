@@ -262,7 +262,7 @@ export default function LeaderboardPage() {
 
                   {/* Avatar — styled as a dossier photo */}
                   <div
-                    className="flex-shrink-0 flex items-center justify-center font-black text-sm overflow-hidden"
+                    className="flex-shrink-0 flex items-center justify-center font-black text-sm overflow-hidden relative"
                     style={{
                       width: 42,
                       height: 42,
@@ -270,11 +270,23 @@ export default function LeaderboardPage() {
                       background: "#0e0b05",
                       color: "#c9a84c",
                       fontFamily: "Georgia, serif",
-                      filter: "sepia(0.4)",
                     }}
                   >
                     {entry.photoURL ? (
-                      <img src={entry.photoURL} alt="" className="w-full h-full object-cover" style={{ filter: "sepia(0.3) contrast(1.1)" }} />
+                      <img
+                        src={entry.photoURL}
+                        alt=""
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                          filter: "sepia(0.25) contrast(1.05)",
+                        }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
                     ) : (
                       entry.displayName[0]?.toUpperCase()
                     )}
@@ -295,30 +307,33 @@ export default function LeaderboardPage() {
                     </p>
 
                     {/* Role wins */}
-                    <div className="flex gap-3 mt-1.5">
+                    <div className="flex gap-2 mt-1.5 flex-wrap">
                       <span
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: "#4a80b0", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+                        style={{ color: "#4a80b0", background: "#4a80b015", fontFamily: "Georgia, serif", letterSpacing: "0.04em" }}
                         title="Liberal wins"
                       >
-                        <Shield size={10} strokeWidth={2} />
-                        {entry.winsByRole.liberal}
+                        <Shield size={9} strokeWidth={2} />
+                        <span style={{ fontSize: 9 }}>LIBERAL</span>
+                        <span className="font-black">{entry.winsByRole.liberal}</span>
                       </span>
                       <span
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: "#b03a2a", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+                        style={{ color: "#b03a2a", background: "#b03a2a15", fontFamily: "Georgia, serif", letterSpacing: "0.04em" }}
                         title="Fascist wins"
                       >
-                        <Zap size={10} strokeWidth={2} />
-                        {entry.winsByRole.fascist}
+                        <Zap size={9} strokeWidth={2} />
+                        <span style={{ fontSize: 9 }}>FASCIST</span>
+                        <span className="font-black">{entry.winsByRole.fascist}</span>
                       </span>
                       <span
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: "#6a5a5a", fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}
+                        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+                        style={{ color: "#7a5a5a", background: "#7a5a5a15", fontFamily: "Georgia, serif", letterSpacing: "0.04em" }}
                         title="Hitler wins"
                       >
-                        <Skull size={10} strokeWidth={2} />
-                        {entry.winsByRole.hitler}
+                        <Skull size={9} strokeWidth={2} />
+                        <span style={{ fontSize: 9 }}>HITLER</span>
+                        <span className="font-black">{entry.winsByRole.hitler}</span>
                       </span>
                     </div>
                   </div>
